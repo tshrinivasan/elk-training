@@ -1,0 +1,353 @@
+1. get details
+curl -X GET 'http://localhost:9200'
+
+
+2. Add first entry
+
+curl -X POST 'http://localhost:9200/tutorial/helloworld/1' -d '{ "message": "Hello World!" }'
+
+
+3. Get a document
+
+curl -X GET 'http://localhost:9200/tutorial/helloworld/1'
+
+
+4. Modify a document
+
+curl -X PUT 'localhost:9200/tutorial/helloworld/1?pretty' -d '
+{
+"message": "Hello People!"
+}'
+
+
+5. Pretty output
+
+curl -X GET 'http://localhost:9200/tutorial/helloworld/1?pretty'
+
+
+
+6. List indexes
+
+curl 'localhost:9200/_cat/indices?v'
+
+
+=========
+
+7. Load bulk data
+
+curl -XPOST 'localhost:9200/bank/account/_bulk?pretty&refresh' --data-binary "@accounts.json"
+
+
+
+
+8. simple search
+
+curl -XGET 'localhost:9200/bank/_search?q=*&sort=account_number:asc&pretty'
+
+
+
+8.1 same query
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match_all": {} },
+  "sort": [
+    { "account_number": "asc" }
+  ]
+}'
+
+
+
+
+9. match all
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match_all": {} }
+}'
+
+
+
+
+10. sort result
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match_all": {} },
+  "sort": { "balance": { "order": "desc" } }
+}'
+
+
+
+
+
+11. return specific fields
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match_all": {} },
+  "_source": ["account_number", "balance"]
+}'
+
+
+
+12. Get specific value
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match": { "account_number": 20 } }
+}'
+
+
+
+12.1
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match": { "address": "mill" } }
+}'
+
+
+
+
+13. string search (or)
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match": { "address": "mill lane" } }
+}'
+
+
+
+14. full phrase 
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": { "match_phrase": { "address": "mill lane" } }
+}'
+
+
+
+
+
+15. bool  (must)  and 
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "address": "mill" } },
+        { "match": { "address": "lane" } }
+      ]
+    }
+  }
+}'
+
+
+
+16 bool - should - or
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": {
+    "bool": {
+      "should": [
+        { "match": { "address": "mill" } },
+        { "match": { "address": "lane" } }
+      ]
+    }
+  }
+}'
+
+
+
+17. neithor - nor
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": {
+    "bool": {
+      "must_not": [
+        { "match": { "address": "mill" } },
+        { "match": { "address": "lane" } }
+      ]
+    }
+  }
+}'
+
+
+
+18. Mixed : returns all accounts of anybody who is 40 years old but don’t live in ID(aho):
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "age": "40" } }
+      ],
+      "must_not": [
+        { "match": { "state": "ID" } }
+      ]
+    }
+  }
+}'
+
+
+
+
+19. Filter
+
+This example uses a bool query to return all accounts with balances between 20000 and 30000, inclusive. In other words, we want to find accounts with a balance that is greater than or equal to 20000 and less than or equal to 30000.
+
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "query": {
+    "bool": {
+      "must": { "match_all": {} },
+      "filter": {
+        "range": {
+          "balance": {
+            "gte": 20000,
+            "lte": 30000
+          }
+        }
+      }
+    }
+  }
+}'
+
+
+
+
+20. Aggregations
+
+
+this example groups all the accounts by state, and then returns the top 10 (default) states sorted by count descending (also default):
+
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "size": 0,
+  "aggs": {
+    "group_by_state": {
+      "terms": {
+        "field": "state.keyword"
+      }
+    }
+  }
+}'
+
+
+
+
+21.
+
+Building on the previous aggregation, this example calculates the average account balance by state (again only for the top 10 states sorted by count in descending order):
+
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "size": 0,
+  "aggs": {
+    "group_by_state": {
+      "terms": {
+        "field": "state.keyword"
+      },
+      "aggs": {
+        "average_balance": {
+          "avg": {
+            "field": "balance"
+          }
+        }
+      }
+    }
+  }
+}'
+
+
+
+22. 
+let’s now sort on the average balance in descending order:
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "size": 0,
+  "aggs": {
+    "group_by_state": {
+      "terms": {
+        "field": "state.keyword",
+        "order": {
+          "average_balance": "desc"
+        }
+      },
+      "aggs": {
+        "average_balance": {
+          "avg": {
+            "field": "balance"
+          }
+        }
+      }
+    }
+  }
+}'
+
+
+
+23. 
+This example demonstrates how we can group by age brackets (ages 20-29, 30-39, and 40-49), then by gender, and then finally get the average account balance, per age bracket, per gender:
+
+
+curl -XGET 'localhost:9200/bank/_search?pretty' -d'
+{
+  "size": 0,
+  "aggs": {
+    "group_by_age": {
+      "range": {
+        "field": "age",
+        "ranges": [
+          {
+            "from": 20,
+            "to": 30
+          },
+          {
+            "from": 30,
+            "to": 40
+          },
+          {
+            "from": 40,
+            "to": 50
+          }
+        ]
+      },
+      "aggs": {
+        "group_by_gender": {
+          "terms": {
+            "field": "gender.keyword"
+          },
+          "aggs": {
+            "average_balance": {
+              "avg": {
+                "field": "balance"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+
